@@ -12,23 +12,23 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(RequirementAlreadyExistsException.class)
 	public ResponseEntity<ErrorResponse> handleRequirementAlreadyExists(RequirementAlreadyExistsException ex) {
-		ErrorResponse errorResponse = new ErrorResponse(HttpStatus.BAD_REQUEST.value(), ex.getMessage(),
+		ErrorResponse errorResponse = new ErrorResponse(HttpStatus.OK.value(), ex.getMessage(),
 				LocalDateTime.now());
-		return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+		return new ResponseEntity<>(errorResponse, HttpStatus.OK);
 	}
 
 	@ExceptionHandler(RequirementNotFoundException.class)
 	public ResponseEntity<ErrorResponse> handleRequirementNotFound(RequirementNotFoundException ex) {
-		ErrorResponse errorResponse = new ErrorResponse(HttpStatus.BAD_REQUEST.value(), ex.getMessage(),
+		ErrorResponse errorResponse = new ErrorResponse(HttpStatus.OK.value(), ex.getMessage(),
 				LocalDateTime.now());
-		return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+		return new ResponseEntity<>(errorResponse, HttpStatus.OK);
 	}
 
 	@ExceptionHandler(NoJobsAssignedToRecruiterException.class)
 	public ResponseEntity<ErrorResponse> handleNoJobsAssignedToRecruiter(NoJobsAssignedToRecruiterException ex) {
-		ErrorResponse errorResponse = new ErrorResponse(HttpStatus.BAD_REQUEST.value(), ex.getMessage(),
+		ErrorResponse errorResponse = new ErrorResponse(HttpStatus.OK.value(), ex.getMessage(),
 				LocalDateTime.now());
-		return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+		return new ResponseEntity<>(errorResponse, HttpStatus.OK);
 	}
 
 	@ExceptionHandler(Exception.class)

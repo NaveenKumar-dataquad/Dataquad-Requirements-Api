@@ -15,8 +15,8 @@ import jakarta.persistence.JoinColumn;
 import java.time.LocalDateTime;
 import java.util.Set;
 
-@Entity
 @Data
+@Entity
 public class RequirementsModel {
 
     @Id
@@ -65,7 +65,7 @@ public class RequirementsModel {
         joinColumns = @JoinColumn(name = "job_id")
     )
     @Column(name = "recruiter_id")  
-    private Set<String> recruiterIds;  
+    private Set<String> recruiterIds;
 
     private String status;
     
