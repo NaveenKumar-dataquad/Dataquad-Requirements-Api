@@ -4,7 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 
 @Data
-@AllArgsConstructor
+
 public class AssignRecruiterResponse
 {
 	private String jobId;
@@ -40,4 +40,10 @@ public class AssignRecruiterResponse
 	public void setMessage(String message) {
 		this.message = message;
 	}
+	public AssignRecruiterResponse(String jobId, String recruiterId, String message) {
+		this.jobId = jobId;
+		this.recruiterId = recruiterId;
+		this.message = message;
+	}
+
 }

@@ -34,7 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.dataquadinc.service.RequirementsService;
 import org.springframework.web.multipart.MultipartFile;
 
-@CrossOrigin(origins = {"http://35.188.150.92", "http://192.168.0.140:3000", "http://192.168.0.139:3000","https://mymulya.com","https://localhost:3000"})
+@CrossOrigin(origins = {"http://35.188.150.92", "http://192.168.0.140:3000", "http://192.168.0.139:3000","https://mymulya.com","http://localhost:3000","http://192.168.0.135:8080"})
 @RestController
 @RequestMapping("/requirements")
 //@CrossOrigin("*")
