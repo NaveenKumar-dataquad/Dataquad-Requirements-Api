@@ -24,6 +24,7 @@ import static org.aspectj.weaver.NameMangler.PREFIX;
 @Table(name = "requirements_model")
 public class RequirementsModel {
 
+
     @Id
     private String jobId;
 
@@ -63,7 +64,6 @@ public class RequirementsModel {
     private String salaryPackage;
 
     private int noOfPositions;
-    private String assignedBy;
 
     @Lob
     @Column(name = "job_description_blob")
@@ -83,15 +83,8 @@ public class RequirementsModel {
 
     private String status;
     private Set<String> recruiterName;
+    private String assignedBy;
 
-    // Setter for recruiterName to handle stringified list format properly
-    public void setRecruiterName(String recruiterNameJson) {
-        if (recruiterNameJson != null && !recruiterNameJson.isEmpty()) {
-            // Clean the stringified list if necessary
-            recruiterNameJson = recruiterNameJson.replaceAll("[\\[\\]\"]", "");  // Removes brackets and quotes
-            this.recruiterName = Set.of(recruiterNameJson.split(","));
-        }
-    }
 
     public byte[] getJobDescriptionBlob() {
         return jobDescriptionBlob;
@@ -136,7 +129,6 @@ public class RequirementsModel {
         }
     }
 
-
     private void generateJobId() {
         try {
             // Use EntityManager through EntityManagerFactory instead of field injection
@@ -167,6 +159,7 @@ public class RequirementsModel {
             throw new RuntimeException("Error generating job ID", e);
         }
     }
+
 
     public String getStatus() {
         return status;
@@ -294,14 +287,6 @@ public class RequirementsModel {
         return recruiterIds;
     }
 
-    public String getAssignedBy() {
-        return assignedBy;
-    }
-
-    public void setAssignedBy(String assignedBy) {
-        this.assignedBy = assignedBy;
-    }
-
     public void setRecruiterIds(Set<String> recruiterIds) {
         if (recruiterIds != null) {
             this.recruiterIds = recruiterIds.stream()
@@ -310,4 +295,11 @@ public class RequirementsModel {
         }
     }
 
+    public String getAssignedBy() {
+        return assignedBy;
+    }
+
+    public void setAssignedBy(String assignedBy) {
+        this.assignedBy = assignedBy;
+    }
 }

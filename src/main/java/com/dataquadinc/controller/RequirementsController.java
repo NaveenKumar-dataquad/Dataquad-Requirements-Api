@@ -1,3 +1,4 @@
+
 package com.dataquadinc.controller;
 
 import java.io.IOException;
@@ -34,7 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.dataquadinc.service.RequirementsService;
 import org.springframework.web.multipart.MultipartFile;
 
-@CrossOrigin(origins = {"http://35.188.150.92", "http://192.168.0.140:3000", "http://192.168.0.139:3000","https://mymulya.com","http://localhost:3000","http://192.168.0.135:8080"})
+@CrossOrigin(origins = {"http://35.188.150.92", "http://192.168.0.140:3000", "http://192.168.0.139:3000","https://mymulya.com","http://localhost:3000"})
 @RestController
 @RequestMapping("/requirements")
 //@CrossOrigin("*")
@@ -69,7 +70,7 @@ public class RequirementsController {
 			@RequestParam("noOfPositions") int noOfPositions,
 			@RequestParam("recruiterIds") Set<String> recruiterIds,
 			@RequestParam(value = "recruiterName", required = false) Set<String> recruiterName,
-			@RequestParam("assignedBy") String assignedBy // Added assignedBy parameter
+			@RequestParam("assignedBy") String assignedBy
 	) throws IOException {
 		try {
 			// Validate that only one of jobDescription or jobDescriptionFile is provided
@@ -121,6 +122,7 @@ public class RequirementsController {
 			requirementsDto.setRecruiterIds(recruiterIds);
 			requirementsDto.setRecruiterName(recruiterName);
 			requirementsDto.setAssignedBy(assignedBy);
+
 			// Call the service to create the requirement
 			RequirementAddedResponse response = service.createRequirement(requirementsDto);
 
@@ -167,32 +169,35 @@ public class RequirementsController {
 			// Use Apache Tika to detect the content type
 			Tika tika = new Tika();
 			String contentType = tika.detect(jobDescriptionBytes);  // Detects the content type of the byte array
-			String fileExtension = "bin"; // Default extension for unknown files
+			String fileExtension = ""; // Default extension will be empty to handle dynamic extension
 
 			// Based on detected content type, set appropriate file extension
 			if (contentType.equals("application/pdf")) {
-				fileExtension = "pdf";
+				fileExtension = ".pdf";
 			} else if (contentType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document")) {
-				fileExtension = "docx";
+				fileExtension = ".docx";
 			} else if (contentType.equals("text/plain")) {
-				fileExtension = "txt";
+				fileExtension = ".txt";
 			} else if (contentType.equals("image/png")) {
-				fileExtension = "png";
+				fileExtension = ".png";
 			} else if (contentType.equals("image/jpeg")) {
-				fileExtension = "jpg";
+				fileExtension = ".jpg";
 			} else {
-				// If it's an unknown type, keep "bin" as the extension (generic binary)
+				// Log warning for unknown content types
 				logger.warn("Unknown content type detected: {}", contentType);
 			}
 
-			filename += "." + fileExtension;
+			// Append the detected file extension to the filename if available
+			if (!fileExtension.isEmpty()) {
+				filename += fileExtension;
+			}
 
 			// Convert the byte array to a ByteArrayResource for downloading
 			ByteArrayResource resource = new ByteArrayResource(jobDescriptionBytes);
 
-			// Return the file as a response for download
+			// Return the file as a response for download with the proper content type and filename
 			return ResponseEntity.ok()
-					.contentType(MediaType.parseMediaType(contentType))
+					.contentType(MediaType.parseMediaType(contentType))  // Set the content type based on detection
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
 					.body(resource);
 
@@ -209,7 +214,6 @@ public class RequirementsController {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
 		}
 	}
-
 	// Helper method to check if the byte array is a PDF (you could improve this with more detailed checks)
 	private boolean isPdf(byte[] data) {
 		return data != null && data.length > 4 && data[0] == '%'
@@ -261,6 +265,7 @@ public class RequirementsController {
 	}
 
 
+
 	@GetMapping("/get/{jobId}")
 	public ResponseEntity<RequirementsDto> getRequirementById(@PathVariable String jobId) {
 		return new ResponseEntity<>(service.getRequirementDetailsById(jobId), HttpStatus.OK);
@@ -271,8 +276,9 @@ public class RequirementsController {
 		try {
 			// Retrieve the job requirement to check if the job exists
 			RequirementsModel requirement = requirementsDao.findById(jobId)
-					.orElseThrow(() -> new RequirementNotFoundException("Requirement Not Found with Id: " + jobId));
+					.orElseThrow(() -> new RequirementNotFoundException("Requirement Not Found with Id : " + jobId));
 
+			// Flag to check if any error occurs before sending emails
 			boolean allEmailsSentSuccessfully = true;
 
 			// Convert List to Set and clean the recruiter IDs
@@ -280,60 +286,73 @@ public class RequirementsController {
 					.map(id -> id.replaceAll("[\"\\[\\]]", "").trim())
 					.collect(Collectors.toSet());
 
-			// Assign recruiters and send emails
-			for (String recruiterId : cleanedRecruiterIds) {
+			// Assign each recruiter to the job and send emails immediately
+			for (String recruiterId : recruiterIds) {
 				try {
-					// Assign the recruiter (assuming this handles updating recruiter names in DB)
+					// Assign the recruiter and save email to DB
 					service.assignToRecruiter(jobId, Collections.singleton(recruiterId));
 
-					// Fetch recruiter details
+					// Fetch the recruiter's email and name (assuming these methods exist in your service)
 					String recruiterEmail = service.getRecruiterEmail(recruiterId);
-					String recruiterName = service.getRecruiterName(recruiterId); // Fetch name from service
+					String recruiterName = service.getRecruiterName(recruiterId); // This should be available in the service
 
+					// Log recruiter ID and fetched email
 					logger.info("Fetched recruiterId: {} with email: {}", recruiterId, recruiterEmail);
 
+					// Check if the email and name are not null or empty
 					if (recruiterEmail == null || recruiterEmail.isEmpty()) {
 						throw new RecruiterNotFoundException("Email for recruiter " + recruiterId + " not found");
 					}
 
-					// Prepare email content
+					// Add the recruiter name to the job requirement's recruiterName set
+					requirement.getRecruiterName().add(recruiterName); // Add recruiter name to Set
+
+					System.out.println("Recruiter names before saving: " + requirement.getRecruiterName());
+
+					// Prepare the email subject and body
 					String subject = "New Job Assignment: " + requirement.getJobTitle();
+
 					String body = "Dear " + recruiterName + ",\n\n" +
-							"I hope this message finds you well.\n\n" +
-							"You have been assigned a new job requirement, and the details are outlined below:\n\n" +
+							"I hope this message finds you well. \n\n" +
+							"You have been assigned a new job requirement, and the details are outlined below:  \n\n" +
 							"Job Title: " + requirement.getJobTitle() + "\n" +
 							"Client: " + requirement.getClientName() + "\n" +
 							"Location: " + requirement.getLocation() + "\n" +
 							"Job Type: " + requirement.getJobType() + "\n" +
 							"Experience Required: " + requirement.getExperienceRequired() + " years\n\n" +
-							"**Assigned By:** " + requirement.getAssignedBy() + "\n\n" + // Added Assigned By field
+							"Assigned By: " + requirement.getAssignedBy() + "\n\n" + // Added Assigned By field
 							"Please take a moment to review the details and proceed with the necessary actions. Additional information can be accessed via your dashboard.\n\n" +
 							"If you have any questions or require further clarification, feel free to reach out.\n\n" +
 							"Best Regards,\nDataquad";
 
-					// Send email
+					// Send email to the recruiter
 					emailService.sendEmail(recruiterEmail, subject, body);
-					logger.info("Email sent to recruiter {} at {} for job: {}", recruiterName, recruiterEmail, requirement.getJobTitle());
+
+					// Log the email sending action
+					logger.info("Email sent to recruiter {} at {} for job: {}", recruiterEmail, requirement.getJobTitle());
 
 				} catch (Exception e) {
+					// Log the full exception stack trace for better error diagnosis
 					logger.error("Failed to send email to recruiter {} for job {}. Error: {}", recruiterId, requirement.getJobTitle(), e.getMessage(), e);
 					allEmailsSentSuccessfully = false;
 				}
 			}
 
-			// Return response based on email status
+			// Return success response after attempting to assign recruiters and send emails
 			if (allEmailsSentSuccessfully) {
 				return ResponseEntity.ok(ResponseBean.successResponse("Recruiters assigned and email notifications sent successfully.", null));
 			} else {
 				return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
-						.body(ResponseBean.errorResponse("Some recruiter emails failed to send. Please check logs for details.", null));
+						.body(ResponseBean.errorResponse("Some recruiter emails failed to send. Please check the logs for details.", null));
 			}
 
 		} catch (Exception e) {
+			// Handle errors (e.g., if jobId doesn't exist)
 			logger.error("Error assigning recruiters: {}", e.getMessage(), e);
 			return ResponseEntity.badRequest().body(ResponseBean.errorResponse("Error assigning recruiters: " + e.getMessage(), e.toString()));
 		}
 	}
+
 
 
 	@PutMapping("/updateStatus")
@@ -346,7 +365,6 @@ public class RequirementsController {
 	public ResponseEntity<List<RecruiterRequirementsDto>> getJobsByRecruiter(@PathVariable String recruiterId) {
 		return new ResponseEntity<>(service.getJobsAssignedToRecruiter(recruiterId),HttpStatus.OK);
 	}
-
 	@PutMapping("/updateRequirement/{jobId}")
 	public ResponseEntity<ResponseBean> updateRequirement(
 			@PathVariable String jobId,
@@ -357,7 +375,7 @@ public class RequirementsController {
 			@RequestParam("jobType") String jobType,
 			@RequestParam("location") String location,
 			@RequestParam("jobMode") String jobMode,
-			@RequestParam("status")String status,
+			@RequestParam("status") String status,
 			@RequestParam("experienceRequired") String experienceRequired,
 			@RequestParam("noticePeriod") String noticePeriod,
 			@RequestParam("relevantExperience") String relevantExperience,
@@ -369,43 +387,62 @@ public class RequirementsController {
 			@RequestParam("assignedBy") String assignedBy // Added assignedBy parameter
 	) throws IOException {
 		try {
+			// Validate that only one of jobDescription or jobDescriptionFile is provided
 			if ((jobDescription != null && !jobDescription.isEmpty()) &&
 					(jobDescriptionFile != null && !jobDescriptionFile.isEmpty())) {
 				return ResponseEntity.badRequest()
 						.body(ResponseBean.errorResponse("You can either provide a job description text or upload a job description file, but not both.", "Bad Request"));
 			}
 
+			// Fetch the existing requirement
 			RequirementsDto existingRequirement = service.getRequirementDetailsById(jobId);
 			if (existingRequirement == null) {
 				return ResponseEntity.status(HttpStatus.NOT_FOUND)
 						.body(ResponseBean.errorResponse("Requirement not found for the provided jobId", "Not Found"));
 			}
 
+			// Debugging: Check the current status
+			System.out.println("Existing status before update: " + existingRequirement.getStatus());
+
+			// Set or nullify fields that are not being updated
 			if (jobTitle != null && !jobTitle.isEmpty()) existingRequirement.setJobTitle(jobTitle);
 			else existingRequirement.setJobTitle(null);
 
+			// Check and update the status
+			if (status != null && !status.isEmpty()) {
+				existingRequirement.setStatus(status);
+				System.out.println("Updated status to: " + status); // Debugging: Log updated status
+			} else {
+				existingRequirement.setStatus(null);
+			}
+
+			// Handle clientName and other fields similarly
 			if (clientName != null && !clientName.isEmpty()) existingRequirement.setClientName(clientName);
 			else existingRequirement.setClientName(null);
 
+			// Logic to set job description and BLOB
 			String finalJobDescription = null;
 			byte[] jobDescriptionBlob = null;
 
+			// If jobDescriptionFile is provided, process the file and set the BLOB
 			if (jobDescriptionFile != null && !jobDescriptionFile.isEmpty()) {
-				jobDescriptionBlob = jobDescriptionFile.getBytes();
-				finalJobDescription = null;
-			} else if (jobDescription != null && !jobDescription.isEmpty()) {
+				jobDescriptionBlob = jobDescriptionFile.getBytes(); // Save the file as a BLOB
+				finalJobDescription = null; // Use the file (no text)
+			}
+			// If jobDescription (text) is provided, use it and set the BLOB to null
+			else if (jobDescription != null && !jobDescription.isEmpty()) {
 				finalJobDescription = jobDescription;
-				jobDescriptionBlob = null;
+				jobDescriptionBlob = null; // Use the text (no file)
 			}
 
+			// Set the job description (from file or text)
 			existingRequirement.setJobDescription(finalJobDescription);
-			existingRequirement.setJobDescriptionBlob(jobDescriptionBlob);
+			existingRequirement.setJobDescriptionBlob(jobDescriptionBlob); // Set the BLOB (or null)
 
+			// Set the other fields and nullify any fields that are not being updated
 			if (jobType != null && !jobType.isEmpty()) existingRequirement.setJobType(jobType);
 			else existingRequirement.setJobType(null);
 
-			if(status!=null&& !status.isEmpty())existingRequirement.setStatus(status);
-            else existingRequirement.setStatus(null);
 			if (location != null && !location.isEmpty()) existingRequirement.setLocation(location);
 			else existingRequirement.setLocation(null);
 
@@ -428,7 +465,7 @@ public class RequirementsController {
 			else existingRequirement.setSalaryPackage(null);
 
 			if (noOfPositions > 0) existingRequirement.setNoOfPositions(noOfPositions);
-			else existingRequirement.setNoOfPositions(0);
+			else existingRequirement.setNoOfPositions(0); // If noOfPositions is not updated, set to 0
 
 			if (recruiterIds != null && !recruiterIds.isEmpty()) existingRequirement.setRecruiterIds(recruiterIds);
 			else existingRequirement.setRecruiterIds(null);
@@ -439,8 +476,13 @@ public class RequirementsController {
 			if (assignedBy != null && !assignedBy.isEmpty()) existingRequirement.setAssignedBy(assignedBy); // Added assignedBy field
 			else existingRequirement.setAssignedBy(null);
 
+			// Call the service to update the requirement
 			ResponseBean response = service.updateRequirementDetails(existingRequirement);
 
+			// Debugging: Log the updated status after saving
+			System.out.println("Status after saving: " + existingRequirement.getStatus());
+
+			// Return success response
 			return ResponseEntity.status(HttpStatus.OK).body(ResponseBean.successResponse("Requirement updated successfully", response));
 
 		} catch (IllegalArgumentException e) {
@@ -474,5 +516,6 @@ public class RequirementsController {
 //	public ExtendedRequirementsDto getFullRequirementDetails(@PathVariable String jobId) {
 //		return service.getFullRequirementDetails(jobId);
 //	}
+
 
 }

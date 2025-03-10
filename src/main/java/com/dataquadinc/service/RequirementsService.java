@@ -106,6 +106,7 @@ public class RequirementsService {
 
 
 		// If jobId is not set, let @PrePersist handle the generation
+		// If jobId is not set, let @PrePersist handle the generation
 		if (model.getJobId() == null || model.getJobId().isEmpty()) {
 			model.setStatus("In Progress");
 			model.setRequirementAddedTimeStamp(LocalDateTime.now());
@@ -115,7 +116,6 @@ public class RequirementsService {
 			throw new RequirementAlreadyExistsException(
 					"Requirements Already Exists with Job Id : " + model.getJobId());
 		}
-
 
 
 		// Send email to each recruiter assigned to the requirement
@@ -404,15 +404,15 @@ public class RequirementsService {
 
 		if (jobsByRecruiterId.isEmpty()) {
 			throw new NoJobsAssignedToRecruiterException("No Jobs Assigned To Recruiter : " + recruiterId);
-		} else {
-			return jobsByRecruiterId.stream()
-					.map(recruiter -> {
-						RecruiterRequirementsDto dto = modelMapper.map(recruiter, RecruiterRequirementsDto.class);
-						dto.setAssignedBy(recruiter.getAssignedBy()); // Ensure assignedBy is mapped
-						return dto;
-					})
-					.collect(Collectors.toList());
 		}
+
+		return jobsByRecruiterId.stream()
+				.map(job -> {
+					RecruiterRequirementsDto dto = modelMapper.map(job, RecruiterRequirementsDto.class);
+					dto.setAssignedBy(job.getAssignedBy()); // Ensure assignedBy is mapped
+					return dto;
+				})
+				.collect(Collectors.toList());
 	}
 
 
@@ -463,6 +463,7 @@ public class RequirementsService {
 			existingRequirement.setRecruiterName(requirementsDto.getRecruiterName());
 			existingRequirement.setAssignedBy(requirementsDto.getAssignedBy());
 			if (requirementsDto.getStatus() != null) existingRequirement.setStatus(requirementsDto.getStatus());
+
 
 			// Save the updated requirement to the database
 			requirementsDao.save(existingRequirement);
