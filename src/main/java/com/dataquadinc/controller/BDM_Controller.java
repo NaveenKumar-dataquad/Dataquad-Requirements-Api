@@ -19,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -87,10 +88,10 @@ public class BDM_Controller {
                         .body(ResponseBean.errorResponse("Client not found", "No client exists with ID: " + id)));
     }
 
-    @PutMapping("/bdm/{id}")
+    @PutMapping(value = "/bdm/{id}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
     public ResponseEntity<ResponseBean> updateClient(
             @PathVariable String id,
-            @RequestPart("dto") String dtoJson,
+            @RequestPart("dto") String dtoJson,  // Expect JSON as a String
             @RequestPart(value = "supportingDocuments", required = false) List<MultipartFile> files) {
 
         try {
@@ -108,15 +109,12 @@ public class BDM_Controller {
                             .body(ResponseBean.errorResponse("Update failed", "No client exists with ID: " + id)));
 
         } catch (JsonProcessingException e) {
-            // ❌ Handle invalid JSON format
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(ResponseBean.errorResponse("Invalid JSON Format", "Error in JSON structure: " + e.getMessage()));
         } catch (IOException e) {
-            // ❌ Handle general parsing errors
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(ResponseBean.errorResponse("JSON Parsing Error", "Could not parse client data."));
         } catch (Exception e) {
-            // ❌ Catch any unexpected exceptions
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ResponseBean.errorResponse("Unexpected Error", "Something went wrong: " + e.getMessage()));
         }
