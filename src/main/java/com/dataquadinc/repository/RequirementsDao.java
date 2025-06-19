@@ -176,30 +176,30 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     List<Tuple> findAllSubmissionsByClientName(@Param("clientName") String clientName);
 
     @Query(value = """
-        SELECT 
-            cd.candidate_id, 
-            cd.full_name, 
-            cd.candidate_email_id AS candidateEmailId, 
-            cd.contact_number, 
-            cd.qualification, 
-            cs.skills, 
-            cs.overall_feedback, 
-            cd.user_id,
-            r.job_id, 
-            r.job_title, 
-            b.client_name
-        FROM candidate_submissions cs
-        JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-        JOIN requirements_model r ON cs.job_id = r.job_id
-        JOIN bdm_client b ON r.client_name = b.client_name
-        WHERE b.client_name = :clientName
-          AND DATE(cs.submitted_at) BETWEEN :startDate AND :endDate
-        """, nativeQuery = true)
+    SELECT DISTINCT 
+        cd.candidate_id, 
+        cd.full_name, 
+        cd.candidate_email_id AS candidateEmailId, 
+        cd.contact_number, 
+        cd.qualification, 
+        cs.skills, 
+        cs.overall_feedback, 
+        cd.user_id,
+        r.job_id, 
+        r.job_title, 
+        b.client_name
+    FROM candidate_submissions cs
+    JOIN candidates cd ON cs.candidate_id = cd.candidate_id
+    JOIN requirements_model r ON cs.job_id = r.job_id
+    JOIN bdm_client b ON r.client_name = b.client_name
+    WHERE LOWER(b.client_name) LIKE LOWER(CONCAT('%', :clientName, '%'))
+      AND DATE(cs.submitted_at) BETWEEN :startDate AND :endDate
+    """, nativeQuery = true)
     List<Tuple> findAllSubmissionsByClientNameAndSubmittedAtBetween(
             @Param("clientName") String clientName,
             @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate
-    );
+            @Param("endDate") LocalDate endDate);
+
 
     @Query(value = """
     SELECT 
@@ -254,28 +254,25 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
         cd.qualification, 
         cs.skills, 
         CASE 
-            WHEN JSON_VALID(li.interview_status) 
-            THEN JSON_UNQUOTE(JSON_EXTRACT(li.interview_status, '$[0].status')) 
-            ELSE li.interview_status 
+            WHEN JSON_VALID(idt.interview_status) 
+            THEN JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) 
+            ELSE idt.interview_status 
         END AS interview_status, 
-        li.interview_level, 
-        li.interview_date_time, 
+        idt.interview_level, 
+        idt.interview_date_time, 
         r.job_id, 
         r.job_title, 
         b.client_name
-    FROM (
+    FROM interview_details idt
+    JOIN (
         SELECT 
-            idt.candidate_id,
-            idt.interview_status,
-            idt.interview_level,
-            idt.interview_date_time,
-            idt.timestamp,
-            cs.job_id,
-            ROW_NUMBER() OVER (PARTITION BY idt.candidate_id ORDER BY idt.interview_date_time DESC) AS rn 
-        FROM interview_details idt
-        JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
-    ) li
-    JOIN candidate_submissions cs ON li.job_id = cs.job_id
+            candidate_id, 
+            MAX(interview_date_time) AS latest_interview_time
+        FROM interview_details
+        GROUP BY candidate_id
+    ) latest ON latest.candidate_id = idt.candidate_id 
+             AND latest.latest_interview_time = idt.interview_date_time
+    JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
     JOIN candidates cd ON cs.candidate_id = cd.candidate_id
     JOIN requirements_model r ON cs.job_id = r.job_id
     LEFT JOIN bdm_client b ON r.client_name = b.client_name
@@ -283,17 +280,19 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
            OR (:clientName IS NULL AND EXISTS (
                 SELECT 1 FROM candidate_submissions cs2 
                 WHERE cs2.job_id = r.job_id
-           )) )
-    AND li.rn = 1
-    AND b.client_name IS NOT NULL 
-    AND li.interview_date_time IS NOT NULL
-    AND DATE(li.timestamp) BETWEEN :startDate AND :endDate
+           )))
+      AND b.client_name IS NOT NULL 
+      AND idt.interview_date_time IS NOT NULL
+      AND DATE(idt.timestamp) BETWEEN :startDate AND :endDate
     """, nativeQuery = true)
     List<Tuple> findAllInterviewsByClientNameDateFilter(
             @Param("clientName") String clientName,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
+
+
+
 
 
     @Query(value = """
